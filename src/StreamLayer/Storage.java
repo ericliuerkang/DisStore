@@ -6,6 +6,7 @@ import Socket.SocketNode;
 import java.io.*;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 import java.util.Properties;
 import java.sql.*;
 
@@ -16,22 +17,24 @@ public class Storage implements IStorage{
     Connection c;
     Statement s;
     SocketNode socket;
+    private int port;
 
-    public Storage(String id, int listenPort){
+    public Storage(String id, int port){
         this.id = id;
+        this.port = port;
         try {
             System.out.println("Socket node initializing");
-            socket = new SocketNode(InetAddress.getLocalHost(), 59898, listenPort);
+            socket = new SocketNode(InetAddress.getLocalHost(), port);
             System.out.println("Socket node initialized");
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
     }
 
-    public Storage(String id, int listenPort, String address, int port){
+    public Storage(String id, String address, int port){
         this.id = id;
         try {
-            socket = new SocketNode(InetAddress.getByName(address), port, listenPort);
+            socket = new SocketNode(InetAddress.getLocalHost(), port);
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
@@ -217,7 +220,7 @@ public class Storage implements IStorage{
     private void handleCommand(String cmdLine) {
         System.out.println("command: "+cmdLine);
         String[] args = cmdLine.split("\\s+");
-
+        System.out.println(Arrays.toString(args));
         if (args.length < 1) {
             System.out.println("Enter commands");
         } else if(args.length == 1 && args[0].equals("connect")){
@@ -244,8 +247,13 @@ public class Storage implements IStorage{
             }
         } else if (args.length == 3 && args[0].equals("delete")) {
             delete(args[1], args[2]);
-        } else if (args.length == 2 && args[0].equals("send")) {
-            socket.send(id, args[1]);
+        } else if (args.length == 3 && args[0].equals("send")) {
+            try {
+                int port = Integer.parseInt(args[1]);
+                socket.send(id, port, args[2]);
+            } catch (NumberFormatException e) {
+                e.printStackTrace();
+            }
         } else if (args.length == 1 && args[0].equals("receive")) {
             Message msg = socket.receive();
             if (msg == null) {
@@ -254,6 +262,8 @@ public class Storage implements IStorage{
             else {
                 System.out.println("Received " + msg.getMessage() + ", from " + msg.getId());
             }
+        } else if (args.length == 1 && args[0].equals("info")) {
+            System.out.println("Port number: "+String.valueOf(port));
         }
     }
 
@@ -269,8 +279,8 @@ public class Storage implements IStorage{
 
         try {
             System.out.println("Storage Initializing");
-            int listenPort = Integer.parseInt(args[0]);
-            Storage storage = new Storage("C:\\StreamLayer.Storage\\test.txt", listenPort);
+            int port = Integer.parseInt(args[0]);
+            Storage storage = new Storage("C:\\StreamLayer.Storage\\test.txt", port);
             System.out.println("Storage Initialized");
             storage.run();
         } catch (NumberFormatException e) {

@@ -20,15 +20,17 @@ public class SocketNode {
     private final int port;
     private ServerSocket ss;
     private Listen listener;
+    private PriorityQueue<Message> msgQ;
 
-    public SocketNode(InetAddress address, int sendPort, int listenPort){
+    public SocketNode(InetAddress address, int port){
         this.address = address;
-        this.port = sendPort;
+        this.port = port;
+        this.msgQ = new PriorityQueue<Message>();
         try {
-            this.ss = new ServerSocket(listenPort);
+            this.ss = new ServerSocket(port);
 //            run(address, listenPort);
             ExecutorService pool = Executors.newFixedThreadPool(3);
-            listener = new Listen(ss.accept());
+            listener = new Listen(ss, msgQ);
             pool.execute(listener);
         } catch (Exception e) {
             e.printStackTrace();
@@ -36,17 +38,34 @@ public class SocketNode {
     }
 
     private static class Listen implements Runnable {
+        private final ServerSocket ss;
+        private final PriorityQueue<Message> msgQ;
+
+        Listen(ServerSocket ss, PriorityQueue<Message> msgQ){
+            this.ss = ss;
+            this.msgQ = msgQ;
+        }
+
+        @Override
+        public void run() {
+            ExecutorService pool = Executors.newFixedThreadPool(3);
+            while (true) {
+                try {
+                    pool.execute(new ThreadListen(ss.accept(), msgQ));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    private static class ThreadListen implements Runnable {
         private final Socket socket;
         private final PriorityQueue<Message> msgQ;
 
-        Listen(Socket socket) throws IOException {
+        ThreadListen(Socket socket, PriorityQueue<Message> msgQ) throws IOException {
             this.socket = socket;
-            this.msgQ = new PriorityQueue<Message>();
-        }
-
-        Listen(Socket socket, int queueSize) throws IOException {
-            this.socket = socket;
-            this.msgQ = new PriorityQueue<Message>(queueSize);
+            this.msgQ = msgQ;
         }
 
         @Override
@@ -55,15 +74,9 @@ public class SocketNode {
             try {
                 in = new ObjectInputStream(socket.getInputStream());
                 while (true) {
-                    try {
-                        Message msg = (Message) in.readObject();
-                        msgQ.add(msg);
-                        System.out.println("Received " + msg.getMessage() + " from " + msg.getId());
-                    } catch (EOFException e) {
-//                        continue;
-                    }
+                    readMsg(in, msgQ);
                 }
-            } catch (IOException | ClassNotFoundException e) {
+            } catch (IOException e) {
                 e.printStackTrace();
             } finally {
                 try {
@@ -76,34 +89,33 @@ public class SocketNode {
                 }
             }
         }
-    }
 
-    public Message receive() {
-        return listener.msgQ.poll();
-    }
-
-    public void send(Message msg) throws IOException {
-        try (Socket socket = new Socket(address, port);
-             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());){
-            out.writeObject(msg);
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
+        private synchronized void readMsg(ObjectInputStream in, PriorityQueue<Message> msgQ){
             try {
-                out.close();
-                socket.close();
-            } catch (Exception e) {
+                Message msg = (Message) in.readObject();
+                System.out.println("\nReceived " + msg.getMessage() + " from " + msg.getId());
+                msgQ.add(msg);
+            } catch (EOFException eof) {
+//                System.out.println("EOF");
+            }
+
+            catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
             }
         }
     }
 
-    public void send(String id, String msg){
-        try (Socket socket = new Socket(address, port);
-            ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());){
-            out.writeObject(new Message(msg, id));
-        } catch (Exception e) {
-            e.printStackTrace();
+    public Message receive() {
+        return msgQ.poll();
+    }
+
+    public void send(String id, int destPort, String msg){
+        while (true) {
+            try (Socket socket = new Socket("localhost", destPort);
+                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());) {
+                out.writeObject(new Message(msg, id));
+                return;
+            } catch (Exception e) { }
         }
     }
 }
