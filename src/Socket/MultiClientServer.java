@@ -28,7 +28,36 @@ public class MultiClientServer {
             System.out.println("The capitalization server is running...");
             ExecutorService pool = Executors.newFixedThreadPool(20);
             while (true) {
+                send("Stream Manager", "hello");
                 pool.execute(new Capitalizer(listener.accept()));
+            }
+        }
+    }
+
+//    public void send(Message msg) throws IOException {
+//        try (Socket socket = new Socket(address, port);
+//             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());){
+//            out.writeObject(msg);
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        } finally {
+//            try {
+//                out.close();
+//                socket.close();
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
+//        }
+//    }
+//
+    public static void send(String id, String msg){
+        while (true) {
+            try (Socket socket = new Socket("localhost", 50000);
+                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());) {
+                out.writeObject(new Message(msg, id));
+                return;
+            } catch (Exception e) {
+                continue;
             }
         }
     }
@@ -53,13 +82,10 @@ public class MultiClientServer {
 //                    out.println(outline);
 //                }
                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-//                ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
                 OutputStream out = socket.getOutputStream();
 
-//                List<Message> listOfMessages = (List<Message>) in.readObject();
                 Message msg = (Message) in.readObject();
                 System.out.println("Received "+msg.getMessage()+" from "+msg.getId());
-//                listOfMessages.forEach((msg) ->System.out.println("Received "+msg.getMessage()+" from "+msg.getId()));
             } catch (Exception e) {
                 e.printStackTrace();
                 System.out.println("Error:" + socket);

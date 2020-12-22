@@ -17,21 +17,21 @@ public class Storage implements IStorage{
     Statement s;
     SocketNode socket;
 
-    public Storage(String id){
+    public Storage(String id, int listenPort){
         this.id = id;
         try {
             System.out.println("Socket node initializing");
-            socket = new SocketNode(InetAddress.getLocalHost(), 59898);
+            socket = new SocketNode(InetAddress.getLocalHost(), 59898, listenPort);
             System.out.println("Socket node initialized");
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
     }
 
-    public Storage(String id, String address, int port){
+    public Storage(String id, int listenPort, String address, int port){
         this.id = id;
         try {
-            socket = new SocketNode(InetAddress.getByName(address), port);
+            socket = new SocketNode(InetAddress.getByName(address), port, listenPort);
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
@@ -267,9 +267,14 @@ public class Storage implements IStorage{
          */
 
 
-        System.out.println("Storage Initializing");
-        Storage storage = new Storage("C:\\StreamLayer.Storage\\test.txt");
-        System.out.println("Storage Initialized");
-        storage.run();
+        try {
+            System.out.println("Storage Initializing");
+            int listenPort = Integer.parseInt(args[0]);
+            Storage storage = new Storage("C:\\StreamLayer.Storage\\test.txt", listenPort);
+            System.out.println("Storage Initialized");
+            storage.run();
+        } catch (NumberFormatException e) {
+            e.printStackTrace();
+        }
     }
 }
