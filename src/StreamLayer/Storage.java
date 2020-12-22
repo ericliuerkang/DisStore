@@ -1,16 +1,40 @@
+package StreamLayer;
+
+import Socket.Message;
+import Socket.SocketNode;
+
 import java.io.*;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Properties;
 import java.sql.*;
 
 public class Storage implements IStorage{
     Properties prop = new Properties();
-    String name;
+    String id;
     private final String PROMPT = "Storage> ";
     Connection c;
     Statement s;
+    SocketNode socket;
 
-    public Storage(String name){
-        this.name = name;
+    public Storage(String id){
+        this.id = id;
+        try {
+            System.out.println("Socket node initializing");
+            socket = new SocketNode(InetAddress.getLocalHost(), 59898);
+            System.out.println("Socket node initialized");
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public Storage(String id, String address, int port){
+        this.id = id;
+        try {
+            socket = new SocketNode(InetAddress.getByName(address), port);
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -220,6 +244,16 @@ public class Storage implements IStorage{
             }
         } else if (args.length == 3 && args[0].equals("delete")) {
             delete(args[1], args[2]);
+        } else if (args.length == 2 && args[0].equals("send")) {
+            socket.send(id, args[1]);
+        } else if (args.length == 1 && args[0].equals("receive")) {
+            Message msg = socket.receive();
+            if (msg == null) {
+                System.out.println("Didn't receive message");
+            }
+            else {
+                System.out.println("Received " + msg.getMessage() + ", from " + msg.getId());
+            }
         }
     }
 
@@ -233,7 +267,9 @@ public class Storage implements IStorage{
          */
 
 
-        Storage storage = new Storage("C:\\Storage\\test.txt");
+        System.out.println("Storage Initializing");
+        Storage storage = new Storage("C:\\StreamLayer.Storage\\test.txt");
+        System.out.println("Storage Initialized");
         storage.run();
     }
 }

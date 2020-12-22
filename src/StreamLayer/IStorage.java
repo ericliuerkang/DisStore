@@ -1,3 +1,5 @@
+package StreamLayer;
+
 public interface IStorage {
     void connect();
     void store(String tableName, String key, String value);
