@@ -1,15 +1,17 @@
 package StreamLayer;
 
 import Socket.*;
-import sun.plugin.net.proxy.PluginProxyInfo;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.function.Function;
 
 public class StreamManager extends Storage implements IStreamManager{
     private final SocketNode socket;
     private final String id;
+    private HashMap<String, Function<Message, Runnable>> handlerMapping = new HashMap<>();
 
     private static class StreamInfo{
         public String id;
@@ -53,6 +55,12 @@ public class StreamManager extends Storage implements IStreamManager{
         this.id = super.id;
     }
 
+    public void handlerMappingSetup(){
+        Function<Message, Runnable> func = this::getReportHandle;
+        assert (func!=null);
+        handlerMapping.put("REPORT", func);
+    }
+
     @Override
     public void send(int destPort, String msg) {
         super.sendMessage(id, destPort, msg);
@@ -78,29 +86,6 @@ public class StreamManager extends Storage implements IStreamManager{
 
     }
 
-//    private Runnable setStreamHealthCheck(StreamInfo s) {
-//        final Runnable healthcheck = () -> {
-//            do {
-//                send(s.getPort(), "HEALTHCHECK");
-//                try {
-//                    TimeUnit.SECONDS.sleep(1);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                    return;
-//                }
-//            } while (receive() != null);
-//            s.setStatus(Status.FAILED);
-//        };
-//        return healthcheck;
-//    }
-//
-//    private final Runnable healthCheck = () -> {
-//        ExecutorService executor = Executors.newFixedThreadPool(5);
-//        for (StreamInfo s:
-//             streams) {
-//            executor.execute(setStreamHealthCheck(s));
-//        }
-//    };
 
     private Runnable getReportHandle(Message msg) {
         System.out.println("Got report msg: "+msg.getId());
@@ -121,32 +106,21 @@ public class StreamManager extends Storage implements IStreamManager{
                 System.out.println("New Stream Online"+reportMsg.getId());
 
                 StreamInfo newStream = new StreamInfo(reportMsg.getId(), reportMsg.getReport());
+                streams.add(newStream);
             });
         };
         return reportHandle;
     }
 
-    private void listen () {
-        ExecutorService executor = Executors.newFixedThreadPool(10);
-        while (true) {
-            Message msg = receive();
-            if (msg == null) {continue;}
 
-            switch (msg.getMessage()) {
-
-                //when a stream report its status
-                case "REPORT":
-                    executor.execute(getReportHandle(msg));
-            }
-        }
-    }
+    private Runnable listener = super.getListener(handlerMapping);
 
 
 
     public static void main(String[] args){
         StreamManager streamManager = new StreamManager("StreamManager", 59898);
-//        ExecutorService executor = Executors.newFixedThreadPool(5);
-//        executor.execute(streamManager.healthCheck);
-        streamManager.listen();
+        streamManager.handlerMappingSetup();
+        ExecutorService executor = Executors.newFixedThreadPool(5);
+        executor.execute(streamManager.getListener(streamManager.handlerMapping));
     }
 }

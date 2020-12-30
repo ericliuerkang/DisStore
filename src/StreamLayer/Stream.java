@@ -6,7 +6,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.concurrent.*;
+import java.util.function.Function;
 
 public class Stream extends Storage implements IStorage {
     private SocketNode socket;
@@ -14,6 +16,8 @@ public class Stream extends Storage implements IStorage {
     private String id;
     private int port;
     protected Status status;
+    private HashMap<String, Function<Message, Runnable>> handlerMapping = new HashMap<>();
+
 
     //Constructors
 
@@ -22,6 +26,7 @@ public class Stream extends Storage implements IStorage {
         this.id = super.id;
         this.port = super.port;
         this.socket = super.socket;
+        handlerMappingSetup();
     }
 
     public Stream(String id, String address, int port) {
@@ -29,11 +34,16 @@ public class Stream extends Storage implements IStorage {
         this.id = super.id;
         this.port = super.port;
         this.socket = super.socket;
+        handlerMappingSetup();
     }
 
     public int getPort(){return port;}
     public String getId(){return id;}
 
+
+    public void handlerMappingSetup(){
+        handlerMapping.put("ADDTABLE", this::getAddTableHandle);
+    }
 
     //Commandline interface stuff
 
@@ -74,17 +84,9 @@ public class Stream extends Storage implements IStorage {
             } catch (NumberFormatException e) {
                 e.printStackTrace();
             }
-        } else if (args.length == 1 && args[0].equals("receive")) {
-            Message msg = socket.receive();
-            if (msg == null) {
-                System.out.println("Didn't receive message");
-            }
-            else {
-                System.out.println("Received " + msg.getMessage() + ", from " + msg.getId());
-            }
         } else if (args.length == 1 && args[0].equals("info")) {
             System.out.println("\nPort number: "+String.valueOf(port));
-            System.out.print("\n"+Arrays.toString(socket.getMsgQ().toArray()));
+//            System.out.print("\n"+Arrays.toString(socket.getMsgQ().toArray()));
             System.out.println("\nThere are "+String.valueOf(numTables)+" tables");
         }
     }
@@ -115,38 +117,20 @@ public class Stream extends Storage implements IStorage {
         return reportHandle;
     }
 
-    private final Runnable listen = () -> {
-        ExecutorService executor = Executors.newFixedThreadPool(10);
-        while (true) {
-            Message msg = socket.receive();
-            if (msg == null) {continue;}
-
-            switch (msg.getMessage()) {
-
-                //when a stream report its status
-                case "ADDTABLE":
-                    executor.execute(getAddTableHandle(msg));
-            }
-        }
-    };
+    private final Runnable listen = super.getListener(handlerMapping);
 
     private final Runnable periodicReport = () -> {
-//        final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-//        final Runnable sendReport = () -> {
 
         while (true){
             System.out.println("Sending report message");
             ReportMessage msg = new ReportMessage("REPORT", id, port, numTables);
-            send(id, 59898, msg);
-//            try {
-//                TimeUnit.SECONDS.sleep(1);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//                System.out.println("got here");
-//            }
+            send(59898, msg);
+            try {
+                TimeUnit.SECONDS.sleep(1);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
-//        final ScheduledFuture<?> reportHandle = scheduler.scheduleAtFixedRate(sendReport, 0, 1, TimeUnit.SECONDS);
-//        scheduler.schedule(sendReport, 1, TimeUnit.SECONDS);
 
     };
 
@@ -162,11 +146,11 @@ public class Stream extends Storage implements IStorage {
         try {
             System.out.println("Storage Initializing");
             int port = Integer.parseInt(args[0]);
-            StreamLayer.Stream stream = new StreamLayer.Stream("C:\\StreamLayer.Storage\\test.txt", port);
+            StreamLayer.Stream stream = new StreamLayer.Stream("Stream at port"+String.valueOf(port), port);
             System.out.println("Storage Initialized");
             ExecutorService executor = Executors.newFixedThreadPool(3);
-//            executor.execute(stream.run);
-//            executor.execute(stream.listen);
+            executor.execute(stream.run);
+            executor.execute(stream.listen);
             executor.execute(stream.periodicReport);
         } catch (NumberFormatException e) {
             e.printStackTrace();

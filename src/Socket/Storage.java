@@ -3,11 +3,18 @@ package Socket;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
 import java.net.InetAddress;
+import java.net.Socket;
 import java.net.UnknownHostException;
 import java.sql.*;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Properties;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Function;
 
 public class Storage {
     public String id;
@@ -217,12 +224,34 @@ public class Storage {
     public void sendMessage(String id, int destPort, String msg) {
         socket.send(id, destPort, msg);
     }
-    public void send(String id, int destPort, Message msg) {
-        socket.send(id, destPort, msg);
+    public void send(int destPort, Message msg) {
+        socket.send(destPort, msg);
     }
 
-    public Message receiveMessage(String id, int destPort, String msg) {
-        return socket.receive();
-    }
+//    public Message receiveMessage(String id, int destPort, String msg) {
+//        return socket.receive();
+//    }
 
+
+    public Runnable getListener (HashMap<String, Function<Message, Runnable>> map) {
+        final Runnable listener = ()-> {
+            ExecutorService executor = Executors.newFixedThreadPool(6);
+            while (true) {
+                try {
+                    Socket client = socket.getServerSocket().accept();
+                    Message msg = (Message) new ObjectInputStream(client.getInputStream()).readObject();
+
+                    Runnable runnable = map.get(msg.getMessage()).apply(msg);
+                    if (runnable != null) {
+                        executor.execute(runnable);
+                    } else {
+                        System.out.println("Got message "+msg.getMessage()+", no handle found for it");
+                    }
+                } catch (IOException | ClassNotFoundException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        return listener;
+    }
 }
