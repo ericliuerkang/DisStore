@@ -1,27 +1,30 @@
-package StreamLayer;
+package Socket;
 
-import Socket.Message;
-import Socket.SocketNode;
-
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.sql.*;
 import java.util.Arrays;
 import java.util.Properties;
-import java.sql.*;
 
-public class Storage implements IStorage{
-    Properties prop = new Properties();
-    String id;
-    private final String PROMPT = "Storage> ";
-    Connection c;
-    Statement s;
-    SocketNode socket;
-    private int port;
+public class Storage {
+    public String id;
+    private Connection c;
+    private Statement s;
+    public SocketNode socket;
+    public int port;
+    protected int numTables;
+
+    //Constructors
 
     public Storage(String id, int port){
         this.id = id;
         this.port = port;
+        connect();
+        numTables = listTable();
+        System.out.println("There are "+String.valueOf(numTables)+" tables");
         try {
             System.out.println("Socket node initializing");
             socket = new SocketNode(InetAddress.getLocalHost(), port);
@@ -33,6 +36,9 @@ public class Storage implements IStorage{
 
     public Storage(String id, String address, int port){
         this.id = id;
+        connect();
+        numTables = listTable();
+        System.out.println("There are "+String.valueOf(numTables)+" tables");
         try {
             socket = new SocketNode(InetAddress.getLocalHost(), port);
         } catch (UnknownHostException e) {
@@ -40,7 +46,8 @@ public class Storage implements IStorage{
         }
     }
 
-    @Override
+    //Database connection
+
     public void connect() {
         try {
             Class.forName("com.mysql.jdbc.Driver");
@@ -71,6 +78,25 @@ public class Storage implements IStorage{
         }
     }
 
+
+    public void disconnect() {
+        try {
+            if (s != null) {
+                s.close();
+                s = null;
+            }
+            if (c != null) {
+                c.close();
+                c = null;
+            }
+            System.out.println("Successfully disconnected");
+        } catch (SQLException e){
+            e.printStackTrace();
+        }
+    }
+
+    //Table related
+
     public boolean findTable(String tableName) {
         try {
             String sql = "select * from INFORMATION_SCHEMA.TABLES where TABLE_NAME = '"+tableName+"'";
@@ -90,18 +116,22 @@ public class Storage implements IStorage{
         }
     }
 
-    public void listTable() {
+    public int listTable() {
         try {
             String sql = "select * from INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = 'filestore'";
             System.out.println("executing: " + sql);
             ResultSet rs = s.executeQuery(sql);
             String res;
+            int cnt = 0;
             while (rs.next()) {
                 res = rs.getString("TABLE_NAME");
                 System.out.println("Found table: "+res);
+                cnt += 1;
             }
+            return cnt;
         } catch (SQLException e) {
             e.printStackTrace();
+            return -1;
         }
     }
 
@@ -113,12 +143,16 @@ public class Storage implements IStorage{
                 "PRIMARY KEY (id)"+
                 ")  DEFAULT CHARSET=utf8";
         execute(sql);
+        numTables += 1;
     }
 
     public void deleteTable(String tableName) {
         String sql = "DROP TABLE "+tableName;
         execute(sql);
+        numTables -= 1;
     }
+
+    //CRUD and clear
 
     private void execute(String sql) {
         if (c==null) {
@@ -134,19 +168,17 @@ public class Storage implements IStorage{
             e.printStackTrace();
         }
     }
-    @Override
+
     public void store(String tableName, String key, String value) {
         String sql = "insert into "+tableName+" values(null,'"+key+"', '"+value+"')";
         System.out.println(sql);
         execute(sql);
     }
 
-    @Override
     public void update(String tableName, String key, String value) {
         String sql = "update "+tableName+" set v = "+value+" where k = '"+key+"'";
     }
 
-    @Override
     public String read(String tableName, String key) {
         if (c==null) {
             System.out.println("Connection not established");
@@ -170,121 +202,27 @@ public class Storage implements IStorage{
         }
     }
 
-    @Override
     public void delete(String tableName, String key) {
         String sql = "delete from "+tableName+" where k = '"+key+"'";
         execute(sql);
     }
 
-    @Override
-    public void disconnect() {
-        try {
-            if (s != null) {
-                s.close();
-                s = null;
-            }
-            if (c != null) {
-                c.close();
-                c = null;
-            }
-            System.out.println("Successfully disconnected");
-        } catch (SQLException e){
-            e.printStackTrace();
-        }
-    }
-
-    @Override
     public void clear(String tableName) {
         String sql = "delete from "+tableName;
         execute(sql);
     }
 
-    private void run(){
-        while (true) {
-            BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
-            System.out.print(PROMPT);
+    //Socket related
 
-            try {
-                String cmdLine = stdin.readLine();
-                if (cmdLine.equals("disconnect")) {
-                    disconnect();
-                    break;
-                }
-                this.handleCommand(cmdLine);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+    public void sendMessage(String id, int destPort, String msg) {
+        socket.send(id, destPort, msg);
+    }
+    public void send(String id, int destPort, Message msg) {
+        socket.send(id, destPort, msg);
     }
 
-    private void handleCommand(String cmdLine) {
-        System.out.println("command: "+cmdLine);
-        String[] args = cmdLine.split("\\s+");
-        System.out.println(Arrays.toString(args));
-        if (args.length < 1) {
-            System.out.println("Enter commands");
-        } else if(args.length == 1 && args[0].equals("connect")){
-            connect();
-        } else if(args.length == 2 && args[0].equals("setup")){
-            if (findTable(args[1])) {
-                System.out.println("Table named: "+args[1]+" already exists");
-            }
-            else {
-                createTable(args[1]);
-            }
-        } else if(args.length == 2 && args[0].equals("clear")){
-            clear(args[1]);
-        } else if (args.length == 4 && args[0].equals("store")) {
-            System.out.println("Storing "+args[2]+", "+args[3]+", to table: "+args[1]);
-            store(args[1], args[2], args[3]);
-            System.out.println("\nStored key: "+ args[2]+ ", value: "+ args[3]);
-        } else if (args.length == 3 && args[0].equals("read")) {
-            String res = read(args[1], args[2]);
-            if (res == null) {
-                System.out.println("\nKey not found");
-            } else {
-                System.out.println("\nValue for key: "+args[1]+ " is: "+ res+"\n");
-            }
-        } else if (args.length == 3 && args[0].equals("delete")) {
-            delete(args[1], args[2]);
-        } else if (args.length == 3 && args[0].equals("send")) {
-            try {
-                int port = Integer.parseInt(args[1]);
-                socket.send(id, port, args[2]);
-            } catch (NumberFormatException e) {
-                e.printStackTrace();
-            }
-        } else if (args.length == 1 && args[0].equals("receive")) {
-            Message msg = socket.receive();
-            if (msg == null) {
-                System.out.println("Didn't receive message");
-            }
-            else {
-                System.out.println("Received " + msg.getMessage() + ", from " + msg.getId());
-            }
-        } else if (args.length == 1 && args[0].equals("info")) {
-            System.out.println("Port number: "+String.valueOf(port));
-        }
+    public Message receiveMessage(String id, int destPort, String msg) {
+        return socket.receive();
     }
 
-    public static void main(String[] args){
-        /* conenct
-           store foo bar
-           read foo
-           delete foo
-           clear
-           disconnect
-         */
-
-
-        try {
-            System.out.println("Storage Initializing");
-            int port = Integer.parseInt(args[0]);
-            Storage storage = new Storage("C:\\StreamLayer.Storage\\test.txt", port);
-            System.out.println("Storage Initialized");
-            storage.run();
-        } catch (NumberFormatException e) {
-            e.printStackTrace();
-        }
-    }
 }

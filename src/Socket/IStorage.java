@@ -1,4 +1,4 @@
-package StreamLayer;
+package Socket;
 
 public interface IStorage {
     void connect();
