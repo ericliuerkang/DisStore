@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 public class StreamManager extends Storage implements IStreamManager{
@@ -88,26 +89,30 @@ public class StreamManager extends Storage implements IStreamManager{
 
 
     private Runnable getReportHandle(Message msg) {
-        System.out.println("Got report msg: "+msg.getId());
         final Runnable reportHandle = () -> {
+            System.out.println("Got report msg: "+msg.getId());
             ReportMessage reportMsg;
             try {
                 reportMsg = (ReportMessage) msg;
+                System.out.println("Got here1");
             } catch (Exception e) {
                 e.printStackTrace();
                 return;
             }
-            streams.forEach(stream -> {
-                if (stream.id == reportMsg.getId()) {
+            System.out.println("Got here2");
+            for (StreamInfo stream:
+                 streams) {
+                System.out.println("Got here3");
+                if (stream.id.equals(reportMsg.getId())) {
                     stream.timeMillis = System.currentTimeMillis();
                     stream.updateInfo(reportMsg.getReport());
                     return;
                 }
-                System.out.println("New Stream Online"+reportMsg.getId());
+            }
 
-                StreamInfo newStream = new StreamInfo(reportMsg.getId(), reportMsg.getReport());
-                streams.add(newStream);
-            });
+            System.out.println("New Stream Online: " + reportMsg.getId());
+            StreamInfo newStream = new StreamInfo(reportMsg.getId(), reportMsg.getReport());
+            streams.add(newStream);
         };
         return reportHandle;
     }
