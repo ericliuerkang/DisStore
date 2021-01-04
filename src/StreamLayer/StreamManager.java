@@ -48,7 +48,7 @@ public class StreamManager extends Storage implements IStreamManager{
         public Status getStatus(){return status;}
     }
 
-    private final List<StreamInfo> streams = new ArrayList<StreamInfo>();
+    private final ConcurrentHashMap<String, StreamInfo> streams = new ConcurrentHashMap<>();
 
     public StreamManager(String id, int port) {
         super(id, port);
@@ -58,7 +58,6 @@ public class StreamManager extends Storage implements IStreamManager{
 
     public void handlerMappingSetup(){
         Function<Message, Runnable> func = this::getReportHandle;
-        assert (func!=null);
         handlerMapping.put("REPORT", func);
     }
 
@@ -92,24 +91,36 @@ public class StreamManager extends Storage implements IStreamManager{
         final Runnable reportHandle = () -> {
 //            System.out.println("Got report msg: "+msg.getId());
             ReportMessage reportMsg;
+            String id = null;
+            ReportMessage.Report report;
             try {
                 reportMsg = (ReportMessage) msg;
+                id = reportMsg.getId();
+                report = reportMsg.getReport();
             } catch (Exception e) {
                 e.printStackTrace();
                 return;
             }
-            for (StreamInfo stream:
-                 streams) {
-                if (stream.id.equals(reportMsg.getId())) {
-                    stream.timeMillis = System.currentTimeMillis();
-                    stream.updateInfo(reportMsg.getReport());
-                    return;
-                }
+//            for (StreamInfo stream:
+//                 streams) {
+//                if (stream.id.equals(reportMsg.getId())) {
+//                    stream.timeMillis = System.currentTimeMillis();
+//                    stream.updateInfo(reportMsg.getReport());
+//                    return;
+//                }
+//            }
+            StreamInfo stream = streams.get(id);
+            if (stream == null) {
+                System.out.println("New Stream Online: " + id);
+                StreamInfo newStream = new StreamInfo(id, report);
+                streams.put(id, newStream);
+            } else {
+                streams.computeIfPresent(id, (key, value)->{
+                    value.timeMillis = System.currentTimeMillis();
+                    value.updateInfo(report);
+                    return value;
+                });
             }
-
-            System.out.println("New Stream Online: " + reportMsg.getId());
-            StreamInfo newStream = new StreamInfo(reportMsg.getId(), reportMsg.getReport());
-            streams.add(newStream);
         };
         return reportHandle;
     }
@@ -121,14 +132,14 @@ public class StreamManager extends Storage implements IStreamManager{
         System.out.println("Health Check Running");
         while (true) {
             long currTime = System.currentTimeMillis();
-            for (StreamInfo stream :
-                    streams) {
+            streams.forEachEntry(2, (entry)->{
+                StreamInfo stream = entry.getValue();
                 System.out.println("Checking " + stream.id + ", time is " + stream.timeMillis + ", currTime is " + currTime);
                 if (currTime - stream.timeMillis >= 2000) {
                     System.out.println("Stream " + stream.id + " is offline");
-                    streams.remove(stream);
+                    streams.remove(entry.getKey());
                 }
-            }
+            });
         }
     };
 
