@@ -30,7 +30,7 @@ public class SocketNode {
                  ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
                 out.writeObject(new Message(msg, id));
                 return;
-            } catch (Exception e) { }
+            } catch (Exception ignored) { }
         }
     }
 
@@ -41,7 +41,7 @@ public class SocketNode {
                 out.writeObject(msg);
                 System.out.println("sent message");
                 return;
-            } catch (Exception e) {e.printStackTrace(); }
+            } catch (Exception ignored) { }
         }
     }
 }

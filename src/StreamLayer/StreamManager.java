@@ -90,19 +90,16 @@ public class StreamManager extends Storage implements IStreamManager{
 
     private Runnable getReportHandle(Message msg) {
         final Runnable reportHandle = () -> {
-            System.out.println("Got report msg: "+msg.getId());
+//            System.out.println("Got report msg: "+msg.getId());
             ReportMessage reportMsg;
             try {
                 reportMsg = (ReportMessage) msg;
-                System.out.println("Got here1");
             } catch (Exception e) {
                 e.printStackTrace();
                 return;
             }
-            System.out.println("Got here2");
             for (StreamInfo stream:
                  streams) {
-                System.out.println("Got here3");
                 if (stream.id.equals(reportMsg.getId())) {
                     stream.timeMillis = System.currentTimeMillis();
                     stream.updateInfo(reportMsg.getReport());
@@ -118,14 +115,28 @@ public class StreamManager extends Storage implements IStreamManager{
     }
 
 
-    private Runnable listener = super.getListener(handlerMapping);
+    private final Runnable listener = super.getListener(handlerMapping);
 
-
+    private final Runnable healthCheck = () -> {
+        System.out.println("Health Check Running");
+        while (true) {
+            long currTime = System.currentTimeMillis();
+            for (StreamInfo stream :
+                    streams) {
+                System.out.println("Checking " + stream.id + ", time is " + stream.timeMillis + ", currTime is " + currTime);
+                if (currTime - stream.timeMillis >= 2000) {
+                    System.out.println("Stream " + stream.id + " is offline");
+                    streams.remove(stream);
+                }
+            }
+        }
+    };
 
     public static void main(String[] args){
         StreamManager streamManager = new StreamManager("StreamManager", 59898);
         streamManager.handlerMappingSetup();
         ExecutorService executor = Executors.newFixedThreadPool(5);
         executor.execute(streamManager.getListener(streamManager.handlerMapping));
+        executor.execute(streamManager.healthCheck);
     }
 }
