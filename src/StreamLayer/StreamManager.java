@@ -2,11 +2,8 @@ package StreamLayer;
 
 import Socket.*;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 public class StreamManager extends Storage implements IStreamManager{
@@ -29,7 +26,7 @@ public class StreamManager extends Storage implements IStreamManager{
             timeMillis = System.currentTimeMillis();
         }
 
-        public StreamInfo(String id, ReportMessage.Report report){
+        public StreamInfo(String id, StreamReportMessage.Report report){
             this.id = id;
             this.port = report.getPort();
             status = Status.IDLE;
@@ -37,7 +34,7 @@ public class StreamManager extends Storage implements IStreamManager{
             timeMillis = System.currentTimeMillis();
         }
 
-        public void updateInfo(ReportMessage.Report report) {
+        public void updateInfo(StreamReportMessage.Report report) {
             numTables = report.getNumTables();
             timeMillis = System.currentTimeMillis();
         }
@@ -57,8 +54,7 @@ public class StreamManager extends Storage implements IStreamManager{
     }
 
     public void handlerMappingSetup(){
-        Function<Message, Runnable> func = this::getReportHandle;
-        handlerMapping.put("REPORT", func);
+        handlerMapping.put("REPORT", this::getReportHandle);
     }
 
     @Override
@@ -90,25 +86,17 @@ public class StreamManager extends Storage implements IStreamManager{
     private Runnable getReportHandle(Message msg) {
         final Runnable reportHandle = () -> {
 //            System.out.println("Got report msg: "+msg.getId());
-            ReportMessage reportMsg;
+            StreamReportMessage reportMsg;
             String id = null;
-            ReportMessage.Report report;
+            StreamReportMessage.Report report;
             try {
-                reportMsg = (ReportMessage) msg;
+                reportMsg = (StreamReportMessage) msg;
                 id = reportMsg.getId();
                 report = reportMsg.getReport();
             } catch (Exception e) {
                 e.printStackTrace();
                 return;
             }
-//            for (StreamInfo stream:
-//                 streams) {
-//                if (stream.id.equals(reportMsg.getId())) {
-//                    stream.timeMillis = System.currentTimeMillis();
-//                    stream.updateInfo(reportMsg.getReport());
-//                    return;
-//                }
-//            }
             StreamInfo stream = streams.get(id);
             if (stream == null) {
                 System.out.println("New Stream Online: " + id);

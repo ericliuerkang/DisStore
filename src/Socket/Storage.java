@@ -59,14 +59,12 @@ public class Storage {
         try {
             Class.forName("com.mysql.jdbc.Driver");
 
-            // 建立与数据库的Connection连接
-            // 这里需要提供：
-            // 数据库所处于的ip:127.0.0.1 (本机)
-            // 数据库的端口号： 3306 （mysql专用端口号）
-            // 数据库名称 how2java
-            // 编码方式 UTF-8
-            // 账号 root
-            // 密码 admin
+            // database ip: 127.0.0.1
+            // database port: 3306 (mysql port)
+            // database name: filestore
+            // encoding: UTF-8
+            // username: root
+            // password: admin
 
             c = DriverManager
                     .getConnection(
@@ -76,11 +74,7 @@ public class Storage {
             System.out.println("Connection established： " + c);
             System.out.println("Statement created:  "+s);
 
-        } catch (ClassNotFoundException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (SQLException e) {
-            // TODO Auto-generated catch block
+        } catch (ClassNotFoundException | SQLException e) {
             e.printStackTrace();
         }
     }

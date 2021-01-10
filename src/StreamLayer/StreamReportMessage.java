@@ -1,8 +1,10 @@
-package Socket;
+package StreamLayer;
+
+import Socket.Message;
 
 import java.io.Serializable;
 
-public class ReportMessage extends Message implements Serializable, Comparable<Message> {
+public class StreamReportMessage extends Message implements Serializable, Comparable<Message> {
 
     public static class Report implements Serializable{
         private int port;
@@ -17,20 +19,20 @@ public class ReportMessage extends Message implements Serializable, Comparable<M
 
     public Report report;
 
-    public ReportMessage(String message, String id) {
+    public StreamReportMessage(String message, String id) {
         super(message, id);
     }
 
-    public ReportMessage(String message, String id, int priority) {
+    public StreamReportMessage(String message, String id, int priority) {
         super(message, id, priority);
     }
 
-    public ReportMessage(String message, String id, int port, int numTables){
+    public StreamReportMessage(String message, String id, int port, int numTables){
         super(message, id);
         this.report = new Report(port, numTables);
     }
 
-    public ReportMessage(String message, String id, int priority, int port, int numTables) {
+    public StreamReportMessage(String message, String id, int priority, int port, int numTables) {
         super(message, id, priority);
         this.report = new Report(port, numTables);
     }

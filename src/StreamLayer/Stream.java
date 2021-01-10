@@ -123,7 +123,7 @@ public class Stream extends Storage implements IStorage {
 
         while (true){
             System.out.println("Sending report message");
-            ReportMessage msg = new ReportMessage("REPORT", id, port, numTables);
+            StreamReportMessage msg = new StreamReportMessage("REPORT", id, port, numTables);
             send(59898, msg);
             try {
                 TimeUnit.SECONDS.sleep(1);
